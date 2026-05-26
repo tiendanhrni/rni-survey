@@ -63,8 +63,8 @@ export default async function AdminSurveysPage() {
         {/* Error */}
         {fetchError && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <p className="text-sm font-medium text-red-700 mb-1">Không thể kết nối Google Sheets</p>
             <p className="text-sm text-red-600">{fetchError}</p>
-            <p className="text-xs text-red-400 mt-1">Kiểm tra biến môi trường Google Sheets.</p>
           </div>
         )}
 
