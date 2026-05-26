@@ -1,13 +1,12 @@
-import { getSurvey, getAllSlugs } from '@/surveys/index'
+export const dynamic = 'force-dynamic'
+
 import { notFound } from 'next/navigation'
+import { getSurveyBySlug } from '@/lib/sheets'
 import SurveyClient from '@/components/SurveyClient'
 
-export async function generateStaticParams() {
-  return getAllSlugs()
-}
-
 export async function generateMetadata({ params }) {
-  const survey = getSurvey(params.slug)
+  const { slug } = await params
+  const survey = await getSurveyBySlug(slug)
   if (!survey) return {}
   return {
     title: `${survey.title} — ${survey.subtitle}`,
@@ -15,8 +14,9 @@ export async function generateMetadata({ params }) {
   }
 }
 
-export default function SurveyPage({ params }) {
-  const survey = getSurvey(params.slug)
+export default async function SurveyPage({ params }) {
+  const { slug } = await params
+  const survey = await getSurveyBySlug(slug)
   if (!survey) notFound()
   return <SurveyClient survey={survey} />
 }
