@@ -92,6 +92,18 @@ function TextareaQuestion({ question, value = '', onChange }) {
   )
 }
 
+function EmailQuestion({ question, value = '', onChange }) {
+  return (
+    <input
+      type="email"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={question.placeholder || 'email@example.com'}
+      className="w-full text-sm text-gray-700 placeholder-gray-300 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-gray-400 transition-colors"
+    />
+  )
+}
+
 // ─── Progress bar ──────────────────────────────────────────────────────────
 
 function ProgressBar({ value, color }) {
@@ -224,9 +236,12 @@ export default function SurveyClient({ survey }) {
             </svg>
           </div>
           <h1 className="text-xl font-medium text-gray-900 mb-3">Cảm ơn bạn đã tin tưởng chia sẻ</h1>
-          <p className="text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
-            {survey.thankYouMessage}
-          </p>
+          {survey.thankYouMessage && (
+            <div
+              className="text-sm text-gray-500 leading-relaxed max-w-sm mx-auto rich-content"
+              dangerouslySetInnerHTML={{ __html: survey.thankYouMessage }}
+            />
+          )}
 
           {/* Gift section */}
           {survey.gift?.enabled && (
@@ -247,7 +262,12 @@ export default function SurveyClient({ survey }) {
         <div className="mb-8">
           <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide">{survey.subtitle}</p>
           <h1 className="text-2xl font-medium text-gray-900 mb-2">{survey.title}</h1>
-          <p className="text-sm text-gray-500 leading-relaxed">{survey.description}</p>
+          {survey.description && (
+            <div
+              className="text-sm text-gray-500 leading-relaxed rich-content"
+              dangerouslySetInnerHTML={{ __html: survey.description }}
+            />
+          )}
           <p className="text-xs text-gray-400 mt-3 mb-3">
             Khoảng {survey.estimatedTime} · Hoàn toàn ẩn danh
           </p>
@@ -275,6 +295,9 @@ export default function SurveyClient({ survey }) {
               )}
               {q.type === 'textarea' && (
                 <TextareaQuestion question={q} value={answers[q.id] || ''} onChange={v => set(q.id, v)} />
+              )}
+              {q.type === 'email' && (
+                <EmailQuestion question={q} value={answers[q.id] || ''} onChange={v => set(q.id, v)} />
               )}
             </div>
           ))}

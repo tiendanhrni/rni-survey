@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -32,19 +32,22 @@ const QUESTION_TYPES = [
   { value: 'chips', label: 'Chips (chọn nhiều)' },
   { value: 'radio', label: 'Radio (chọn một)' },
   { value: 'scale', label: 'Scale 1-5' },
-  { value: 'textarea', label: 'Textarea (văn bản)' },
+  { value: 'textarea', label: 'Văn bản tự do' },
+  { value: 'email', label: 'Email' },
 ]
 
 const DEFAULT_QUESTION = (type) => ({
   id: genId(),
   type,
-  label: '',
+  label: type === 'email' ? 'Email của bạn' : '',
   required: true,
   hint: '',
   options: type === 'chips' || type === 'radio' ? [{ val: genId(), label: '' }] : [],
   scaleMin: type === 'scale' ? 'Không hài lòng' : '',
   scaleMax: type === 'scale' ? 'Rất hài lòng' : '',
-  placeholder: type === 'textarea' ? 'Viết ra đây nếu bạn muốn...' : '',
+  placeholder: type === 'textarea' ? 'Viết ra đây nếu bạn muốn...'
+    : type === 'email' ? 'email@example.com'
+    : '',
 })
 
 // ─── Input components ──────────────────────────────────────────────────────
@@ -66,19 +69,6 @@ function Input({ label, required, hint, ...props }) {
       <input
         {...props}
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
-      />
-    </div>
-  )
-}
-
-function Textarea({ label, required, hint, ...props }) {
-  return (
-    <div>
-      {label && <Label required={required}>{label}</Label>}
-      {hint && <p className="text-xs text-gray-400 mb-1">{hint}</p>}
-      <textarea
-        {...props}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors resize-none"
       />
     </div>
   )
@@ -107,10 +97,129 @@ function SectionCard({ title, children }) {
   )
 }
 
+// ─── Rich text editor ──────────────────────────────────────────────────────
+
+function RichTextEditor({ label, required, value, onChange, placeholder, rows = 3 }) {
+  const ref = useRef(null)
+  const initialized = useRef(false)
+
+  useEffect(() => {
+    if (ref.current && !initialized.current) {
+      ref.current.innerHTML = value || ''
+      initialized.current = true
+    }
+  }, [])
+
+  const exec = useCallback((cmd, val = null) => {
+    ref.current?.focus()
+    document.execCommand(cmd, false, val)
+    onChange(ref.current?.innerHTML || '')
+  }, [onChange])
+
+  const insertLink = () => {
+    const url = window.prompt('Nhập URL:')
+    if (!url) return
+    exec('createLink', url)
+    ref.current?.querySelectorAll('a:not([target="_blank"])').forEach(a => {
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+    })
+    onChange(ref.current?.innerHTML || '')
+  }
+
+  const insertImage = () => {
+    const url = window.prompt('Nhập URL hình ảnh:')
+    if (!url) return
+    exec('insertHTML', `<img src="${url}" alt="" style="max-width:100%;border-radius:8px;margin:6px 0;display:block;" />`)
+  }
+
+  const insertVideo = () => {
+    const input = window.prompt('Nhập URL YouTube (vd: https://youtube.com/watch?v=xxxxx):')
+    if (!input) return
+    const m = input.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+    if (!m) { window.alert('URL YouTube không hợp lệ'); return }
+    exec('insertHTML', `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px;margin:8px 0;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" src="https://www.youtube.com/embed/${m[1]}" allowfullscreen></iframe></div>`)
+  }
+
+  const Btn = ({ title, onClick, children }) => (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={e => { e.preventDefault(); onClick() }}
+      className="w-7 h-7 flex items-center justify-center rounded text-gray-600 hover:bg-gray-200 transition-colors"
+    >
+      {children}
+    </button>
+  )
+
+  return (
+    <div>
+      {label && <Label required={required}>{label}</Label>}
+      <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:border-gray-400 transition-colors">
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 px-2 py-1 border-b border-gray-100 bg-gray-50">
+          <Btn title="Đậm (Ctrl+B)" onClick={() => exec('bold')}>
+            <strong className="text-sm leading-none">B</strong>
+          </Btn>
+          <Btn title="Nghiêng (Ctrl+I)" onClick={() => exec('italic')}>
+            <em className="text-sm leading-none not-italic font-serif">I</em>
+          </Btn>
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <Btn title="Chèn link" onClick={insertLink}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </Btn>
+          <Btn title="Chèn hình ảnh" onClick={insertImage}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </Btn>
+          <Btn title="Chèn video YouTube" onClick={insertVideo}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.6C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.95A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/>
+              <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02"/>
+            </svg>
+          </Btn>
+        </div>
+        {/* Editable area */}
+        <div
+          ref={ref}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={() => onChange(ref.current?.innerHTML || '')}
+          data-placeholder={placeholder}
+          className="px-3 py-2 text-sm text-gray-900 focus:outline-none leading-relaxed"
+          style={{ minHeight: `${rows * 1.75}rem` }}
+        />
+      </div>
+      <style>{`[contenteditable]:empty::before{content:attr(data-placeholder);color:#9ca3af;pointer-events:none} [contenteditable] a{color:#2563eb;text-decoration:underline} [contenteditable] img{max-width:100%}`}</style>
+    </div>
+  )
+}
+
 // ─── Question editor ───────────────────────────────────────────────────────
 
 function QuestionEditor({ question, index, total, onChange, onDelete, onMoveUp, onMoveDown }) {
   const updateField = (field, value) => onChange({ ...question, [field]: value })
+
+  const changeType = (newType) => {
+    const fresh = DEFAULT_QUESTION(newType)
+    onChange({
+      id: question.id,
+      label: question.label,
+      hint: question.hint,
+      required: question.required,
+      type: newType,
+      options: fresh.options,
+      scaleMin: fresh.scaleMin,
+      scaleMax: fresh.scaleMax,
+      placeholder: fresh.placeholder,
+    })
+  }
 
   const addOption = () => {
     const newOptions = [...(question.options || []), { val: genId(), label: '' }]
@@ -126,8 +235,6 @@ function QuestionEditor({ question, index, total, onChange, onDelete, onMoveUp, 
     onChange({ ...question, options: question.options.filter((_, idx) => idx !== i) })
   }
 
-  const typeLabel = QUESTION_TYPES.find(t => t.value === question.type)?.label || question.type
-
   return (
     <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
       {/* Question header */}
@@ -136,9 +243,16 @@ function QuestionEditor({ question, index, total, onChange, onDelete, onMoveUp, 
           <span className="text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-md px-2 py-1">
             Câu {index + 1}
           </span>
-          <span className="text-xs text-gray-400 bg-white border border-gray-200 rounded-md px-2 py-1">
-            {typeLabel}
-          </span>
+          {/* Type switcher */}
+          <select
+            value={question.type}
+            onChange={e => changeType(e.target.value)}
+            className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:border-gray-400 cursor-pointer transition-colors"
+          >
+            {QUESTION_TYPES.map(t => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -258,13 +372,13 @@ function QuestionEditor({ question, index, total, onChange, onDelete, onMoveUp, 
         </div>
       )}
 
-      {question.type === 'textarea' && (
+      {(question.type === 'textarea' || question.type === 'email') && (
         <div className="mb-3">
           <input
             type="text"
             value={question.placeholder || ''}
             onChange={e => updateField('placeholder', e.target.value)}
-            placeholder="Placeholder của textarea..."
+            placeholder={question.type === 'email' ? 'Placeholder (vd: email@example.com)' : 'Placeholder của textarea...'}
             className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
           />
         </div>
@@ -400,7 +514,6 @@ export default function SurveyForm({ mode = 'create', initialData = null }) {
     })
   }
 
-  // Normalize options: auto-generate val from label if empty
   const normalizeQuestions = (questions) =>
     questions.map(q => ({
       ...q,
@@ -463,11 +576,11 @@ export default function SurveyForm({ mode = 'create', initialData = null }) {
           onChange={e => setField('subtitle', e.target.value)}
           placeholder="Học viện RNI"
         />
-        <Textarea
+        <RichTextEditor
           label="Mô tả / Lời giới thiệu"
           rows={3}
           value={form.description}
-          onChange={e => setField('description', e.target.value)}
+          onChange={v => setField('description', v)}
           placeholder="Đôi lời gửi đến người tham gia khảo sát..."
         />
         <Input
@@ -547,11 +660,11 @@ export default function SurveyForm({ mode = 'create', initialData = null }) {
 
       {/* Section 3: Lời cảm ơn */}
       <SectionCard title="Lời cảm ơn">
-        <Textarea
+        <RichTextEditor
           label="Tin nhắn cảm ơn"
           rows={3}
           value={form.thankYouMessage}
-          onChange={e => setField('thankYouMessage', e.target.value)}
+          onChange={v => setField('thankYouMessage', v)}
           placeholder="Cảm ơn bạn đã dành thời gian chia sẻ..."
         />
       </SectionCard>
@@ -572,11 +685,11 @@ export default function SurveyForm({ mode = 'create', initialData = null }) {
               onChange={e => setField('gift.title', e.target.value)}
               placeholder="Ví dụ: Tài liệu miễn phí"
             />
-            <Textarea
+            <RichTextEditor
               label="Mô tả quà"
               rows={2}
               value={form.gift.description}
-              onChange={e => setField('gift.description', e.target.value)}
+              onChange={v => setField('gift.description', v)}
               placeholder="Mô tả ngắn về quà tặng..."
             />
             <div>
