@@ -92,6 +92,18 @@ function TextareaQuestion({ question, value = '', onChange }) {
   )
 }
 
+function EmailQuestion({ question, value = '', onChange }) {
+  return (
+    <input
+      type="email"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={question.placeholder || 'email@example.com'}
+      className="w-full text-sm text-gray-700 placeholder-gray-300 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-gray-400 transition-colors"
+    />
+  )
+}
+
 // ─── Progress bar ──────────────────────────────────────────────────────────
 
 function ProgressBar({ value, color }) {
@@ -101,6 +113,73 @@ function ProgressBar({ value, color }) {
         className="h-full rounded-full transition-all duration-500"
         style={{ width: `${value}%`, background: color.primary }}
       />
+    </div>
+  )
+}
+
+// ─── Gift display ──────────────────────────────────────────────────────────
+
+function GiftBox({ gift, color }) {
+  const [copied, setCopied] = useState(false)
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(gift.value).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div
+      className="mt-8 rounded-2xl p-5 border"
+      style={{ background: color.light, borderColor: color.primary + '33' }}
+    >
+      {gift.title && (
+        <p className="text-sm font-semibold mb-1" style={{ color: color.dark }}>
+          {gift.title}
+        </p>
+      )}
+      {gift.description && (
+        <p className="text-sm mb-4" style={{ color: color.dark + 'cc' }}>
+          {gift.description}
+        </p>
+      )}
+
+      {gift.type === 'link' && gift.value && (
+        <a
+          href={gift.value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90"
+          style={{ background: color.primary }}
+        >
+          {gift.buttonText || 'Nhận quà ngay'}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+      )}
+
+      {gift.type === 'code' && gift.value && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 font-mono text-base font-bold tracking-widest text-gray-900 text-center">
+              {gift.value}
+            </div>
+            <button
+              type="button"
+              onClick={copyCode}
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-opacity hover:opacity-90 flex-shrink-0"
+              style={{ background: color.primary }}
+            >
+              {copied ? 'Đã copy!' : 'Copy'}
+            </button>
+          </div>
+          {gift.buttonText && gift.buttonText !== 'Nhận quà ngay' && (
+            <p className="text-xs text-center" style={{ color: color.dark + '99' }}>{gift.buttonText}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -123,16 +202,16 @@ export default function SurveyClient({ survey }) {
     if (Array.isArray(v)) return v.length > 0
     return String(v).trim().length > 0
   }).length
-  const progress = Math.round(filled / questions.length * 100)
+  const progress = questions.length > 0 ? Math.round(filled / questions.length * 100) : 0
 
   const handleSubmit = async () => {
     setError('')
     setSubmitting(true)
     try {
-      const res = await fetch('/api/submit', {
+      const res = await fetch(`/api/surveys/${slug}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, answers }),
+        body: JSON.stringify({ answers }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -157,9 +236,18 @@ export default function SurveyClient({ survey }) {
             </svg>
           </div>
           <h1 className="text-xl font-medium text-gray-900 mb-3">Cảm ơn bạn đã tin tưởng chia sẻ</h1>
-          <p className="text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
-            {survey.thankYouMessage}
-          </p>
+          {survey.thankYouMessage && (
+            <div
+              className="text-sm text-gray-500 leading-relaxed max-w-sm mx-auto rich-content"
+              dangerouslySetInnerHTML={{ __html: survey.thankYouMessage }}
+            />
+          )}
+
+          {/* Gift section */}
+          {survey.gift?.enabled && (
+            <GiftBox gift={survey.gift} color={color} />
+          )}
+
           <p className="text-xs text-gray-400 mt-6">{survey.subtitle}</p>
         </div>
       </main>
@@ -174,7 +262,12 @@ export default function SurveyClient({ survey }) {
         <div className="mb-8">
           <p className="text-xs text-gray-400 mb-1 uppercase tracking-wide">{survey.subtitle}</p>
           <h1 className="text-2xl font-medium text-gray-900 mb-2">{survey.title}</h1>
-          <p className="text-sm text-gray-500 leading-relaxed">{survey.description}</p>
+          {survey.description && (
+            <div
+              className="text-sm text-gray-500 leading-relaxed rich-content"
+              dangerouslySetInnerHTML={{ __html: survey.description }}
+            />
+          )}
           <p className="text-xs text-gray-400 mt-3 mb-3">
             Khoảng {survey.estimatedTime} · Hoàn toàn ẩn danh
           </p>
@@ -202,6 +295,9 @@ export default function SurveyClient({ survey }) {
               )}
               {q.type === 'textarea' && (
                 <TextareaQuestion question={q} value={answers[q.id] || ''} onChange={v => set(q.id, v)} />
+              )}
+              {q.type === 'email' && (
+                <EmailQuestion question={q} value={answers[q.id] || ''} onChange={v => set(q.id, v)} />
               )}
             </div>
           ))}
